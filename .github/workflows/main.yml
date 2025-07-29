@@ -4,7 +4,7 @@ on: workflow_dispatch
 
 jobs:
   ubuntu-rdp:
-    if: github.repository == 'yourusername/yourrepo'  # Prevents fork abuse
+    if: github.repository == 'Hasnain1385/Linux'  # Prevents fork abuse
     runs-on: ubuntu-latest
     timeout-minutes: 360
 
