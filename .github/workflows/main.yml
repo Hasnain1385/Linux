@@ -1,10 +1,11 @@
-name: Ubuntu RDP (Xfce) via Remote.it Agent Install
+name: Ubuntu RDP (XFCE4) via Remote.it
 
 on: workflow_dispatch
 
 jobs:
   ubuntu-rdp:
-    if: github.repository == 'yourusername/yourrepo'  # Replace with your actual repo name
+    # Replace with your actual repo to prevent fork abuse
+    if: github.repository == 'Hasnain1385/Linux'
     runs-on: ubuntu-latest
     timeout-minutes: 360
 
@@ -15,32 +16,31 @@ jobs:
         run: |
           echo "::add-mask::$REMOTEIT_REGISTRATION_CODE"
 
-      - name: Install desktop environment, sudo, xrdp, and Remote.it
+      - name: Install XFCE, XRDP, and dependencies
         run: |
           sudo apt update
-          sudo apt install -y sudo xfce4 xfce4-goodies xrdp xorg dbus-x11 x11-xserver-utils curl
+          sudo apt install -y sudo xfce4 xfce4-goodies xrdp xorg dbus-x11 x11-xserver-utils curl policykit-1
 
-      - name: Create RDP user and fix session
+      - name: Create user and configure desktop session
         run: |
-          # Create user
+          # Create a user
           sudo adduser --disabled-password --gecos "" githubuser
           echo "githubuser:rdppassword" | sudo chpasswd
           sudo usermod -aG sudo githubuser
 
-          # Enable and start xrdp
-          sudo systemctl enable xrdp
-          sudo systemctl start xrdp
+          # Fix for XRDP permissions
+          echo "allowed_users=anybody" | sudo tee /etc/X11/Xwrapper.config
 
-          # Setup user's home and .xsession
-          sudo mkdir -p /home/githubuser
-          sudo chown githubuser:githubuser /home/githubuser
-
+          # Create proper .xsession file for XFCE
           echo "startxfce4" | sudo tee /home/githubuser/.xsession
           sudo chown githubuser:githubuser /home/githubuser/.xsession
           sudo chmod +x /home/githubuser/.xsession
 
-          # Fix policykit error
-          echo "allowed_users=anybody" | sudo tee /etc/X11/Xwrapper.config
+          # Enable and restart XRDP and D-Bus
+          sudo systemctl enable dbus
+          sudo systemctl start dbus
+          sudo systemctl enable xrdp
+          sudo systemctl restart xrdp
 
       - name: Install and register Remote.it Agent
         env:
@@ -50,11 +50,12 @@ jobs:
 
       - name: Display RDP login instructions
         run: |
-          echo "=============================="
+          echo "==========================================="
           echo "✅ RDP Username: githubuser"
           echo "✅ RDP Password: rdppassword"
-          echo "🌐 Find this device in your Remote.it dashboard: https://app.remote.it"
-          echo "=============================="
+          echo "🌐 Access via: https://app.remote.it"
+          echo "🔐 Service: Will appear automatically in your device list"
+          echo "==========================================="
 
-      - name: Keep runner alive
-        run: sleep 1800  # 30 minutes
+      - name: Keep runner alive for RDP session
+        run: sleep 1800  # Keeps runner alive for 30 minutes
