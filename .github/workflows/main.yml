@@ -4,43 +4,56 @@ on: workflow_dispatch
 
 jobs:
   ubuntu-rdp:
-    if: github.repository == 'Hasnain1385/Linux'  # Prevents fork abuse
+    if: github.repository == 'yourusername/yourrepo'  # Replace with your actual repo name
     runs-on: ubuntu-latest
     timeout-minutes: 360
 
     steps:
-      - name: Setup desktop environment
-        run: |
-          sudo apt update
-          sudo apt install -y xfce4 xfce4-goodies xrdp curl openssh-client
-
-      - name: Configure xrdp and user
-        run: |
-          sudo systemctl enable xrdp
-          sudo systemctl start xrdp
-          sudo adduser --disabled-password --gecos "" githubuser
-          echo "githubuser:rdppassword" | sudo chpasswd
-          sudo usermod -aG sudo githubuser
-
       - name: Mask Remote.it Registration Code
         env:
           REMOTEIT_REGISTRATION_CODE: ${{ secrets.REMOTEIT_REGISTRATION_CODE }}
         run: |
           echo "::add-mask::$REMOTEIT_REGISTRATION_CODE"
 
-      - name: Install and Register Remote.it Agent
+      - name: Install desktop environment, sudo, xrdp, and Remote.it
+        run: |
+          sudo apt update
+          sudo apt install -y sudo xfce4 xfce4-goodies xrdp xorg dbus-x11 x11-xserver-utils curl
+
+      - name: Create RDP user and fix session
+        run: |
+          # Create user
+          sudo adduser --disabled-password --gecos "" githubuser
+          echo "githubuser:rdppassword" | sudo chpasswd
+          sudo usermod -aG sudo githubuser
+
+          # Enable and start xrdp
+          sudo systemctl enable xrdp
+          sudo systemctl start xrdp
+
+          # Setup user's home and .xsession
+          sudo mkdir -p /home/githubuser
+          sudo chown githubuser:githubuser /home/githubuser
+
+          echo "startxfce4" | sudo tee /home/githubuser/.xsession
+          sudo chown githubuser:githubuser /home/githubuser/.xsession
+          sudo chmod +x /home/githubuser/.xsession
+
+          # Fix policykit error
+          echo "allowed_users=anybody" | sudo tee /etc/X11/Xwrapper.config
+
+      - name: Install and register Remote.it Agent
         env:
           R3_REGISTRATION_CODE: ${{ secrets.REMOTEIT_REGISTRATION_CODE }}
         run: |
-          curl -L https://downloads.remote.it/remoteit/install_agent.sh | sh
+          R3_REGISTRATION_CODE=$R3_REGISTRATION_CODE sh -c "$(curl -L https://downloads.remote.it/remoteit/install_agent.sh)"
 
-      - name: Show RDP login info
+      - name: Display RDP login instructions
         run: |
           echo "=============================="
-          echo "RDP Username: githubuser"
-          echo "RDP Password: rdppassword"
-          echo "Find the device at: https://app.remote.it"
-          echo "(Service will be named 'RDP' or similar)"
+          echo "✅ RDP Username: githubuser"
+          echo "✅ RDP Password: rdppassword"
+          echo "🌐 Find this device in your Remote.it dashboard: https://app.remote.it"
           echo "=============================="
 
       - name: Keep runner alive
