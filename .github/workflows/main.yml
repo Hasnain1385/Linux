@@ -1,0 +1,47 @@
+name: Ubuntu RDP (Xfce) via Remote.it
+
+on: workflow_dispatch
+
+jobs:
+  ubuntu-rdp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360  # max allowed
+
+    steps:
+      - name: Setup environment
+        run: |
+          sudo apt update
+          sudo apt install -y xfce4 xfce4-goodies xrdp curl openssh-client
+
+      - name: Configure xrdp
+        run: |
+          sudo systemctl enable xrdp
+          sudo systemctl start xrdp
+          sudo adduser --disabled-password --gecos "" githubuser
+          echo "githubuser:rdppassword" | sudo chpasswd
+          sudo usermod -aG sudo githubuser
+
+      - name: Install Remote.it CLI
+        run: |
+          curl -L https://downloads.remote.it/cli/remoteit-linux-arm64.tar.gz -o remoteit.tar.gz
+          tar -xzf remoteit.tar.gz
+          sudo install remoteit /usr/local/bin/
+
+      - name: Register RDP service with Remote.it
+        env:
+          REMOTEIT_USERNAME: ${{ secrets.REMOTEIT_USERNAME }}
+          REMOTEIT_PASSWORD: ${{ secrets.REMOTEIT_PASSWORD }}
+        run: |
+          remoteit login --username "$REMOTEIT_USERNAME" --password "$REMOTEIT_PASSWORD"
+          remoteit connectd install
+          remoteit add --name "Github-RDP" --port 3389 --host 127.0.0.1 --type rdp
+          remoteit start
+
+      - name: Output connection info
+        run: |
+          echo "Login: githubuser"
+          echo "Password: rdppassword"
+          echo "Find your RDP service at https://app.remote.it"
+
+      - name: Keep runner alive
+        run: sleep 1800  # 30 minutes
