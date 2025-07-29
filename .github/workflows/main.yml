@@ -13,34 +13,37 @@ jobs:
       - name: Mask Remote.it Registration Code
         env:
           REMOTEIT_REGISTRATION_CODE: ${{ secrets.REMOTEIT_REGISTRATION_CODE }}
-        run: |
-          echo "::add-mask::$REMOTEIT_REGISTRATION_CODE"
+        run: echo "::add-mask::$REMOTEIT_REGISTRATION_CODE"
 
       - name: Install XFCE, XRDP, and dependencies
         run: |
           sudo apt update
           sudo apt install -y sudo xfce4 xfce4-goodies xrdp xorg dbus-x11 x11-xserver-utils curl policykit-1
 
-      - name: Create user and configure desktop session
+      - name: Create user and configure XRDP + XFCE
         run: |
-          # Create a user
+          # Create RDP user
           sudo adduser --disabled-password --gecos "" githubuser
           echo "githubuser:rdppassword" | sudo chpasswd
           sudo usermod -aG sudo githubuser
 
-          # Fix for XRDP permissions
+          # Allow all users to start X session
           echo "allowed_users=anybody" | sudo tee /etc/X11/Xwrapper.config
 
-          # Create proper .xsession file for XFCE
+          # Set XFCE session start for XRDP
           echo "startxfce4" | sudo tee /home/githubuser/.xsession
           sudo chown githubuser:githubuser /home/githubuser/.xsession
           sudo chmod +x /home/githubuser/.xsession
 
-          # Enable and restart XRDP and D-Bus
-          sudo systemctl enable dbus
-          sudo systemctl start dbus
+          # Prevent "failsafe session" error
+          sudo -u githubuser mkdir -p /home/githubuser/.config/xfce4/xfconf/xfce-perchannel-xml
+          sudo -u githubuser cp -r /etc/xdg/xfce4/xfconf/xfce-perchannel-xml/* /home/githubuser/.config/xfce4/xfconf/xfce-perchannel-xml/
+          sudo chown -R githubuser:githubuser /home/githubuser/.config
+
+          # Enable and restart XRDP and DBus
           sudo systemctl enable xrdp
           sudo systemctl restart xrdp
+          sudo systemctl start dbus || true  # socket-activated, safe to continue
 
       - name: Install and register Remote.it Agent
         env:
@@ -48,14 +51,14 @@ jobs:
         run: |
           R3_REGISTRATION_CODE=$R3_REGISTRATION_CODE sh -c "$(curl -L https://downloads.remote.it/remoteit/install_agent.sh)"
 
-      - name: Display RDP login instructions
+      - name: Output connection instructions
         run: |
-          echo "==========================================="
-          echo "✅ RDP Username: githubuser"
-          echo "✅ RDP Password: rdppassword"
-          echo "🌐 Access via: https://app.remote.it"
-          echo "🔐 Service: Will appear automatically in your device list"
-          echo "==========================================="
+          echo "=============================================="
+          echo " ✅ RDP Username: githubuser"
+          echo " ✅ RDP Password: rdppassword"
+          echo " 🌐 Access via: https://app.remote.it"
+          echo " 📡 Service will appear in your Remote.it dashboard"
+          echo "=============================================="
 
       - name: Keep runner alive for RDP session
-        run: sleep 1800  # Keeps runner alive for 30 minutes
+        run: sleep 1800  # 30 minutes
