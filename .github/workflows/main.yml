@@ -1,9 +1,10 @@
-name: Ubuntu RDP (Xfce) via Remote.it
+name: Ubuntu RDP (Xfce) via Remote.it Agent Install
 
 on: workflow_dispatch
 
 jobs:
   ubuntu-rdp:
+    if: github.repository == 'yourusername/yourrepo'  # Prevents fork abuse
     runs-on: ubuntu-latest
     timeout-minutes: 360
 
@@ -21,30 +22,26 @@ jobs:
           echo "githubuser:rdppassword" | sudo chpasswd
           sudo usermod -aG sudo githubuser
 
-      - name: Install Remote.it CLI
-        run: |
-          curl -L https://downloads.remote.it/cli/remoteit-linux-arm64.tar.gz -o remoteit.tar.gz
-          tar -xzf remoteit.tar.gz
-          sudo install remoteit /usr/local/bin/
-
-      - name: Authenticate and register RDP service
+      - name: Mask Remote.it Registration Code
         env:
-          REMOTEIT_ACCESS_KEY_ID: ${{ secrets.REMOTEIT_ACCESS_KEY_ID }}
-          REMOTEIT_ACCESS_KEY_SECRET: ${{ secrets.REMOTEIT_ACCESS_KEY_SECRET }}
+          REMOTEIT_REGISTRATION_CODE: ${{ secrets.REMOTEIT_REGISTRATION_CODE }}
         run: |
-          remoteit auth --id "$REMOTEIT_ACCESS_KEY_ID" --key "$REMOTEIT_ACCESS_KEY_SECRET"
-          remoteit connectd install
-          remoteit add --name "Github-RDP" --port 3389 --host 127.0.0.1 --type rdp
-          remoteit start
+          echo "::add-mask::$REMOTEIT_REGISTRATION_CODE"
 
-      - name: Display RDP login info
+      - name: Install and Register Remote.it Agent
+        env:
+          R3_REGISTRATION_CODE: ${{ secrets.REMOTEIT_REGISTRATION_CODE }}
         run: |
-          echo "==========================="
-          echo "RDP Login: githubuser"
+          curl -L https://downloads.remote.it/remoteit/install_agent.sh | sh
+
+      - name: Show RDP login info
+        run: |
+          echo "=============================="
+          echo "RDP Username: githubuser"
           echo "RDP Password: rdppassword"
-          echo "Remote.it Device/Service: Github-RDP"
-          echo "Access it at: https://app.remote.it"
-          echo "==========================="
+          echo "Find the device at: https://app.remote.it"
+          echo "(Service will be named 'RDP' or similar)"
+          echo "=============================="
 
       - name: Keep runner alive
         run: sleep 1800  # 30 minutes
